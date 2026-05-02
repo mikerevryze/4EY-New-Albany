@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Revryze — Pre-Launch Dashboard</title>
+  <link rel="icon" type="image/png" href="/frontend/favicon_transparent.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.5.0/umd/Recharts.js"></script>
+  <style>
+    body { background: #0f1117; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+    .kpi-card { background: #1a1d2e; border: 1px solid #2a2d3e; }
+    .tab-active { background: #00d68f; color: #000; font-weight: 700; }
+    .tab-inactive { background: #1a1d2e; color: #94a3b8; border: 1px solid #2a2d3e; }
+    .chart-container { background: #1a1d2e; border: 1px solid #2a2d3e; }
+    select, input[type="date"], input[type="number"] {
+      background: #1a1d2e; color: #e2e8f0; border: 1px solid #2a2d3e;
+      padding: 6px 10px; border-radius: 6px; outline: none;
+    }
+    select:focus, input:focus { border-color: #00d68f; }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 8px;
+      background: #334155; border-radius: 4px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 20px; height: 20px;
+      background: #00d68f; border-radius: 50%; cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 20px; height: 20px; background: #00d68f; border-radius: 50%;
+      cursor: pointer; border: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+    const {
+      LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+    } = Recharts;
+
+    function formatCurrency(n) {
+      if (n == null) return "$0.00";
+      return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatNumber(n) {
+      if (n == null) return "0";
+      return Number(n).toLocaleString("en-US");
+    }
+
+    function GoalPlanner({ summary, cdlCount, projectedAdditionalCDLs, setProjectedAdditionalCDLs }) {
+      const MEMBER_GOAL = 250;
+      const CDL_GOAL = 500;
+      const totalMetaLeads = summary.total_meta_leads || 0;
+      const currentMembers = summary.memberships_sold || 0;
+      const currentCPL = summary.cpl || 0;
+      const totalLeadPool = totalMetaLeads + cdlCount;
+      const blendedCloseRate = totalLeadPool > 0 ? currentMembers / totalLeadPool : 0;
+      const membersStillNeeded = Math.max(0, MEMBER_GOAL - currentMembers);
+      const totalLeadsNeeded = blendedCloseRate > 0 ? Math.ceil(membersStillNeeded / blendedCloseRate) : 0;
+      const remainingPaidLeads = Math.max(0, totalLeadsNeeded - projectedAdditionalCDLs);
+      const additionalAdSpend = remainingPaidLeads * currentCPL;
+      const cdlProgress = Math.min(100, (cdlCount / CDL_GOAL) * 100);
+      const memberProgress = Math.min(100, (currentMembers / MEMBER_GOAL) * 100);
+      const sliderMax = Math.max(500, CDL_GOAL - cdlCount);
+
+      return (
+        <div className="chart-container rounded-xl p-6 mb-8">
+          <h3 className="text-lg font-semibold text-white mb-5">Goal Planner</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-slate-400">CDLs: {formatNumber(cdlCount)} / {formatNumber(CDL_GOAL)}</span>
+                <span className="text-slate-400">{cdlProgress.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-4 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: cdlProgress + "%", background: "linear-gradient(90deg, #00d68f, #00b377)" }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-slate-400">Members Sold: {formatNumber(currentMembers)} / {formatNumber(MEMBER_GOAL)}</span>
+                <span className="text-slate-400">{memberProgress.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-4 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: memberProgress + "%", background: "linear-gradient(90deg, #3b82f6, #2563eb)" }} />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <div className="text-sm text-slate-400 mb-1">Blended Close Rate</div>
+              <div className="text-xl font-bold text-white">{(blendedCloseRate * 100).toFixed(2)}%</div>
+              <div className="text-xs text-slate-500">{formatNumber(currentMembers)} members / ({formatNumber(totalMetaLeads)} Meta + {formatNumber(cdlCount)} CDL)</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400 mb-1">Total Leads Still Needed</div>
+              <div className="text-xl font-bold text-white">{blendedCloseRate > 0 ? formatNumber(totalLeadsNeeded) : "\u2014"}</div>
+              <div className="text-xs text-slate-500">{formatNumber(membersStillNeeded)} members needed / {(blendedCloseRate * 100).toFixed(2)}% close rate</div>
+            </div>
+          </div>
+          <div className="mb-6">
+            <label className="text-sm text-slate-400 block mb-2">
+              Projected Additional CDLs: <span className="text-white font-bold">{formatNumber(projectedAdditionalCDLs)}</span>
+            </label>
+            <input type="range" min="0" max={sliderMax} step="5" value={projectedAdditionalCDLs} onChange={function(e) { setProjectedAdditionalCDLs(parseInt(e.target.value)); }} className="w-full h-2 rounded-lg appearance-none cursor-pointer" style={{ accentColor: "#00d68f" }} />
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <span>0</span>
+              <span>{formatNumber(sliderMax)}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <div className="text-sm text-slate-400 mb-1">Remaining Paid Leads Needed</div>
+              <div className="text-xl font-bold text-white">{blendedCloseRate > 0 ? formatNumber(remainingPaidLeads) : "\u2014"}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400 mb-1">Additional Ad Spend Needed</div>
+              <div className="text-xl font-bold text-emerald-400">{blendedCloseRate > 0 ? formatCurrency(additionalAdSpend) : "\u2014"}</div>
+            </div>
+          </div>
+          {blendedCloseRate > 0 && (
+            <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-lg px-5 py-3">
+              <span className="text-emerald-300 font-semibold">
+                If you drive {formatNumber(projectedAdditionalCDLs)} more CDLs, you need {formatCurrency(additionalAdSpend)} more in ad spend to hit {formatNumber(MEMBER_GOAL)} members.
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function KPICard({ label, value, prefix }) {
+      return (
+        <div className="kpi-card rounded-xl p-5 flex flex-col justify-between min-h-[110px]">
+          <div className="text-sm text-slate-400 font-medium uppercase tracking-wide">{label}</div>
+          <div className="text-2xl lg:text-3xl font-bold text-white mt-2">
+            {prefix}{value}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [locations, setLocations] = useState([]);
+      const [activeLocation, setActiveLocation] = useState("");
+      const [summary, setSummary] = useState(null);
+      const [daily, setDaily] = useState([]);
+      const [config, setConfig] = useState(null);
+      const [dateRange, setDateRange] = useState("all");
+      const [customStart, setCustomStart] = useState("");
+      const [customEnd, setCustomEnd] = useState("");
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [settingsOpen, setSettingsOpen] = useState(false);
+      const [availableCampaigns, setAvailableCampaigns] = useState([]);
+      const [cdlCount, setCdlCount] = useState(0);
+      const [projectedCDLsByLocation, setProjectedCDLsByLocation] = useState({});
+      const projectedAdditionalCDLs = projectedCDLsByLocation[activeLocation] || 0;
+      const setProjectedAdditionalCDLs = function(val) {
+        setProjectedCDLsByLocation(function(prev) {
+          var next = Object.assign({}, prev);
+          next[activeLocation] = val;
+          return next;
+        });
+      };
+
+      const getDateParams = useCallback(() => {
+        const today = new Date();
+        let start = null, end = today.toISOString().split("T")[0];
+        if (dateRange === "7") {
+          const d = new Date(today); d.setDate(d.getDate() - 7);
+          start = d.toISOString().split("T")[0];
+        } else if (dateRange === "30") {
+          const d = new Date(today); d.setDate(d.getDate() - 30);
+          start = d.toISOString().split("T")[0];
+        } else if (dateRange === "60") {
+          const d = new Date(today); d.setDate(d.getDate() - 60);
+          start = d.toISOString().split("T")[0];
+        } else if (dateRange === "custom") {
+          start = customStart || null;
+          end = customEnd || end;
+        } else {
+          start = null; end = null;
+        }
+        return { start, end };
+      }, [dateRange, customStart, customEnd]);
+
+      const fetchData = useCallback(async (loc, cfg) => {
+        if (!loc) return;
+        setLoading(true);
+        setError(null);
+        try {
+          const { start, end } = getDateParams();
+          let summaryUrl = `/api/summary?location=${encodeURIComponent(loc)}`;
+          let dailyUrl = `/api/daily?location=${encodeURIComponent(loc)}`;
+          if (start) { summaryUrl += `&start_date=${start}`; dailyUrl += `&start_date=${start}`; }
+          if (end) { summaryUrl += `&end_date=${end}`; dailyUrl += `&end_date=${end}`; }
+          const selectedCampaigns = cfg?.locations?.[loc]?.selected_campaigns || [];
+          if (selectedCampaigns.length > 0) {
+            const encoded = selectedCampaigns.map(c => encodeURIComponent(c)).join(",");
+            summaryUrl += `&campaigns=${encoded}`;
+            dailyUrl += `&campaigns=${encoded}`;
+          }
+
+          const [sRes, dRes, cRes] = await Promise.all([
+            fetch(summaryUrl), fetch(dailyUrl),
+            fetch("/api/campaigns?location=" + encodeURIComponent(loc))
+          ]);
+          if (!sRes.ok) throw new Error("Failed to fetch summary");
+          if (!dRes.ok) throw new Error("Failed to fetch daily data");
+          setSummary(await sRes.json());
+          setDaily(await dRes.json());
+          if (cRes.ok) { setAvailableCampaigns(await cRes.json()); }
+          try {
+            const cdlRes = await fetch("/api/cdls?location=" + encodeURIComponent(loc));
+            if (cdlRes.ok) { setCdlCount((await cdlRes.json()).cdl_count || 0); } else { setCdlCount(0); }
+          } catch (cdlErr) { setCdlCount(0); }
+        } catch (e) {
+          setError(e.message);
+        } finally {
+          setLoading(false);
+        }
+      }, [getDateParams]);
+
+      const initialLoadDone = useRef(false);
+      const prevLocation = useRef("");
+
+      const initApp = useCallback(async () => {
+        try {
+          const [locRes, cfgRes] = await Promise.all([fetch("/api/locations"), fetch("/api/config")]);
+          if (!locRes.ok) throw new Error("Failed to fetch locations");
+          const locs = await locRes.json();
+          const cfg = await cfgRes.json();
+          setLocations(locs);
+          setConfig(cfg);
+          setError(null);
+          if (locs.length > 0) {
+            const firstLoc = locs[0];
+            prevLocation.current = firstLoc;
+            setActiveLocation(firstLoc);
+            initialLoadDone.current = true;
+            fetchData(firstLoc, cfg);
+          }
+        } catch (e) {
+          setError(e.message);
+          setLoading(false);
+        }
+      }, []);
+
+      useEffect(() => { initApp(); }, []);
+
+      useEffect(() => {
+        if (activeLocation && initialLoadDone.current && activeLocation !== prevLocation.current) {
+          prevLocation.current = activeLocation;
+          fetchData(activeLocation, config);
+        }
+      }, [activeLocation]);
+
+      useEffect(() => {
+        if (activeLocation && initialLoadDone.current && dateRange !== "custom") {
+          fetchData(activeLocation, config);
+        }
+      }, [dateRange]);
+
+      useEffect(() => {
+        if (!error) return;
+        const interval = setInterval(() => {
+          if (!initialLoadDone.current) {
+            initApp();
+          } else if (activeLocation) {
+            fetchData(activeLocation, config);
+          }
+        }, 5000);
+        return () => clearInterval(interval);
+      }, [error, activeLocation]);
+
+      const saveConfig = async (newCfg) => {
+        setConfig(newCfg);
+        await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newCfg),
+        });
+      };
+
+      const updateLocationConfig = (field, value) => {
+        if (!config) return;
+        const newCfg = JSON.parse(JSON.stringify(config));
+        if (!newCfg.locations[activeLocation]) {
+          newCfg.locations[activeLocation] = { sales_start_date: null, opening_date: null, selected_campaigns: [] };
+        }
+        newCfg.locations[activeLocation][field] = value || null;
+        saveConfig(newCfg);
+        if (field === "sales_start_date") {
+          fetchData(activeLocation, newCfg);
+        }
+      };
+
+      const updateAttrition = (field, value) => {
+        if (!config) return;
+        const newCfg = JSON.parse(JSON.stringify(config));
+        newCfg.attrition[field] = field === "mode" ? value : parseFloat(value) || 0;
+        saveConfig(newCfg);
+      };
+
+      const toggleCampaign = (campaignName) => {
+        if (!config) return;
+        const newCfg = JSON.parse(JSON.stringify(config));
+        if (!newCfg.locations[activeLocation]) {
+          newCfg.locations[activeLocation] = { sales_start_date: null, opening_date: null, selected_campaigns: [] };
+        }
+        const sel = newCfg.locations[activeLocation].selected_campaigns || [];
+        const idx = sel.indexOf(campaignName);
+        if (idx >= 0) {
+          sel.splice(idx, 1);
+        } else {
+          sel.push(campaignName);
+        }
+        newCfg.locations[activeLocation].selected_campaigns = sel;
+        saveConfig(newCfg);
+        fetchData(activeLocation, newCfg);
+      };
+
+      const clearCampaignFilter = () => {
+        if (!config) return;
+        const newCfg = JSON.parse(JSON.stringify(config));
+        if (!newCfg.locations[activeLocation]) {
+          newCfg.locations[activeLocation] = { sales_start_date: null, opening_date: null, selected_campaigns: [] };
+        }
+        newCfg.locations[activeLocation].selected_campaigns = [];
+        saveConfig(newCfg);
+        fetchData(activeLocation, newCfg);
+      };
+
+      const locConfig = config?.locations?.[activeLocation] || {};
+      const openingDate = locConfig.opening_date;
+      const salesStartDate = locConfig.sales_start_date;
+
+      const today = new Date();
+      const daysUntilOpening = openingDate
+        ? Math.max(0, Math.ceil((new Date(openingDate) - today) / (1000 * 60 * 60 * 24)))
+        : null;
+      const projectedTotal = summary && summary.memberships_per_day > 0 && daysUntilOpening != null
+        ? Math.round(summary.memberships_sold + summary.memberships_per_day * daysUntilOpening)
+        : null;
+
+      const ltvMultiplier = config?.attrition?.mode === "attrition_rate"
+        ? (config.attrition.attrition_rate > 0 ? 1 / (config.attrition.attrition_rate / 100) : 0)
+        : (config?.attrition?.avg_monthly_stay || 0);
+      const estimatedLTV = summary ? summary.total_membership_revenue * ltvMultiplier : 0;
+
+      const cumulativeDaily = [];
+      let cumSum = 0;
+      for (let i = 0; i < daily.length; i++) {
+        cumSum += (daily[i].memberships_sold || 0);
+        cumulativeDaily.push({
+          ...daily[i],
+          report_date: daily[i].report_date,
+          ad_spend: daily[i].ad_spend,
+          cumulative_memberships: cumSum,
+        });
+      }
+
+      let projectionData = [];
+      if (cumulativeDaily.length > 0 && openingDate && summary?.memberships_per_day > 0) {
+        const lastPoint = cumulativeDaily[cumulativeDaily.length - 1];
+        const lastDate = lastPoint.report_date;
+        const lastCum = lastPoint.cumulative_memberships;
+        projectionData = [
+          { report_date: lastDate, projected: lastCum },
+          { report_date: openingDate, projected: projectedTotal },
+        ];
+      }
+
+      const mergedChartData = (() => {
+        const map = {};
+        cumulativeDaily.forEach(d => {
+          map[d.report_date] = { ...d };
+        });
+        projectionData.forEach(d => {
+          if (map[d.report_date]) {
+            map[d.report_date].projected = d.projected;
+          } else {
+            map[d.report_date] = { report_date: d.report_date, projected: d.projected };
+          }
+        });
+        return Object.values(map).sort((a, b) => a.report_date.localeCompare(b.report_date));
+      })();
+
+      return (
+        <div className="min-h-screen px-4 py-6 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <div className="flex items-center gap-3">
+                <img src="/frontend/logo.png" alt="Revryze" className="h-10" />
+                <h1 className="text-2xl font-bold text-white tracking-tight">Pre-Launch Dashboard</h1>
+              </div>
+            </div>
+          </div>
+
+          {/* Location Tabs */}
+          <div className="flex gap-2 mb-6 flex-wrap">
+            {locations.map((loc) => (
+              <button
+                key={loc}
+                onClick={() => setActiveLocation(loc)}
+                className={`px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                  activeLocation === loc ? "tab-active" : "tab-inactive hover:bg-slate-700"
+                }`}
+              >
+                {loc}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Range */}
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="rounded-lg text-sm"
+            >
+              <option value="all">All Time</option>
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="60">Last 60 Days</option>
+              <option value="custom">Custom</option>
+            </select>
+            {dateRange === "custom" && (
+              <>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="rounded-lg text-sm"
+                />
+                <span className="text-slate-400">to</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="rounded-lg text-sm"
+                />
+                <button
+                  onClick={() => fetchData(activeLocation, config)}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold px-4 py-2 rounded-lg text-sm"
+                >
+                  Apply
+                </button>
+              </>
+            )}
+          </div>
+
+          {error && (
+            <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg mb-6">
+              Unable to load data — retrying...
+            </div>
+          )}
+
+          {summary && summary.data_source === "cached" && (
+            <div className="text-slate-500 text-xs mb-4">
+              Showing last cached data
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-center py-20 text-slate-400 text-lg">Loading data...</div>
+          ) : summary ? (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <KPICard label="Total Ad Spend" value={formatCurrency(summary.total_ad_spend)} />
+                <KPICard label="Meta Leads" value={formatNumber(summary.total_meta_leads)} />
+                <KPICard label="Community Driven Leads" value={formatNumber(cdlCount)} />
+                <KPICard label="CPL" value={formatCurrency(summary.cpl)} />
+                <KPICard label="Memberships Sold" value={formatNumber(summary.memberships_sold)} />
+                <KPICard label="Total Revenue" value={formatCurrency(summary.total_membership_revenue)} />
+                <KPICard label="Cost Per Member" value={summary.memberships_sold > 0 ? formatCurrency(summary.cost_per_membership) : "—"} />
+                <KPICard label="Avg Membership Value" value={summary.memberships_sold > 0 ? formatCurrency(summary.total_membership_revenue / summary.memberships_sold) : "—"} />
+              </div>
+
+              {/* LTV Callout */}
+              <div className="kpi-card rounded-xl p-6 mb-8">
+                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                  <div className="flex-1">
+                    <div className="text-sm text-slate-400 mb-2">Attrition Model</div>
+                    <div className="flex gap-4 mb-3">
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="attrition_mode_ltv"
+                          checked={config?.attrition?.mode === "attrition_rate"}
+                          onChange={() => updateAttrition("mode", "attrition_rate")}
+                          className="accent-emerald-400"
+                        />
+                        Monthly Attrition Rate (%)
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="attrition_mode_ltv"
+                          checked={config?.attrition?.mode === "avg_monthly_stay"}
+                          onChange={() => updateAttrition("mode", "avg_monthly_stay")}
+                          className="accent-emerald-400"
+                        />
+                        Avg Monthly Stay (months)
+                      </label>
+                    </div>
+                    {config?.attrition?.mode === "attrition_rate" ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={config.attrition.attrition_rate}
+                        onChange={(e) => updateAttrition("attrition_rate", e.target.value)}
+                        className="w-48 rounded-lg"
+                        placeholder="e.g. 5.0"
+                      />
+                    ) : (
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={config?.attrition?.avg_monthly_stay || 12}
+                        onChange={(e) => updateAttrition("avg_monthly_stay", e.target.value)}
+                        className="w-48 rounded-lg"
+                        placeholder="e.g. 12"
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 bg-emerald-900/30 border border-emerald-700/30 rounded-lg p-5">
+                    <div className="text-sm text-slate-400 mb-1">Estimated Lifetime Value Revryze Has Sold</div>
+                    <div className="text-3xl font-bold text-emerald-400">{formatCurrency(estimatedLTV)}</div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Revenue ({formatCurrency(summary.total_membership_revenue)}) × LTV Multiplier ({ltvMultiplier.toFixed(1)} months)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div className="chart-container rounded-xl p-5">
+                  <h3 className="text-lg font-semibold text-white mb-4">Daily Ad Spend</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={daily}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
+                      <XAxis dataKey="report_date" stroke="#64748b" tick={{ fontSize: 11 }} />
+                      <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: "#1a1d2e", border: "1px solid #2a2d3e", borderRadius: 8 }}
+                        labelStyle={{ color: "#94a3b8" }}
+                      />
+                      <Line type="monotone" dataKey="ad_spend" stroke="#3b82f6" strokeWidth={2} dot={false} name="Ad Spend ($)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="chart-container rounded-xl p-5">
+                  <h3 className="text-lg font-semibold text-white mb-4">Cumulative Memberships Sold</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={mergedChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
+                      <XAxis dataKey="report_date" stroke="#64748b" tick={{ fontSize: 11 }} />
+                      <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: "#1a1d2e", border: "1px solid #2a2d3e", borderRadius: 8 }}
+                        labelStyle={{ color: "#94a3b8" }}
+                      />
+                      <Line type="monotone" dataKey="cumulative_memberships" stroke="#3b82f6" strokeWidth={2} dot={false} name="Actual" />
+                      <Line type="monotone" dataKey="projected" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} name="Projected" />
+                      <Legend />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Sales Velocity */}
+              <div className="chart-container rounded-xl p-6 mb-8">
+                <h3 className="text-lg font-semibold text-white mb-4">Sales Velocity</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-1">Sales Start Date</label>
+                    <input
+                      type="date"
+                      value={salesStartDate || ""}
+                      onChange={(e) => updateLocationConfig("sales_start_date", e.target.value)}
+                      className="w-full rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400 mb-1">Current Velocity</div>
+                    <div className="text-xl font-bold text-white">
+                      {summary.memberships_per_day} <span className="text-sm text-slate-400 font-normal">memberships/day</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400 mb-1">Days Until Opening</div>
+                    <div className="text-xl font-bold text-white">
+                      {daysUntilOpening != null ? daysUntilOpening : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400 mb-1">Projected by Opening</div>
+                    <div className="text-xl font-bold text-white">
+                      {projectedTotal != null ? `${projectedTotal} members` : "—"}
+                    </div>
+                  </div>
+                </div>
+                {projectedTotal != null && (
+                  <div className="mt-5 bg-emerald-600/20 border border-emerald-500/30 rounded-lg px-5 py-3">
+                    <span className="text-emerald-300 font-semibold">
+                      At current pace, you will have {projectedTotal} members by opening day
+                      {openingDate ? ` (${openingDate})` : ""}.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Goal Planner */}
+              <GoalPlanner
+                summary={summary}
+                cdlCount={cdlCount}
+                projectedAdditionalCDLs={projectedAdditionalCDLs}
+                setProjectedAdditionalCDLs={setProjectedAdditionalCDLs}
+              />
+
+              {/* Settings */}
+              <div className="chart-container rounded-xl mb-8">
+                <button
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  className="w-full flex items-center justify-between p-5 text-left"
+                >
+                  <h3 className="text-lg font-semibold text-white">Settings</h3>
+                  <span className="text-slate-400 text-xl">{settingsOpen ? "▲" : "▼"}</span>
+                </button>
+                {settingsOpen && (
+                  <div className="px-6 pb-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="text-sm text-slate-400 block mb-1">Opening Date — {activeLocation}</label>
+                        <input
+                          type="date"
+                          value={openingDate || ""}
+                          onChange={(e) => updateLocationConfig("opening_date", e.target.value)}
+                          className="w-full rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-400 block mb-1">Sales Start Date — {activeLocation}</label>
+                        <input
+                          type="date"
+                          value={salesStartDate || ""}
+                          onChange={(e) => updateLocationConfig("sales_start_date", e.target.value)}
+                          className="w-full rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm text-slate-400 font-medium">Campaign Filter — {activeLocation}</label>
+                        {(locConfig.selected_campaigns || []).length > 0 && (
+                          <button
+                            onClick={clearCampaignFilter}
+                            className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                          >
+                            Clear filter (show all)
+                          </button>
+                        )}
+                      </div>
+                      {availableCampaigns.length > 0 ? (
+                        <div className="space-y-2" style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {availableCampaigns.map((c) => (
+                            <label key={c} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(locConfig.selected_campaigns || []).includes(c)}
+                                onChange={() => toggleCampaign(c)}
+                                className="accent-emerald-400"
+                              />
+                              {c}
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-500 italic">No campaigns available</div>
+                      )}
+                      <div className="text-xs text-slate-500 mt-2">No campaigns selected = all campaigns included</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
