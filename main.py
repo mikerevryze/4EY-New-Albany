@@ -29,7 +29,7 @@ app.add_middleware(
 CONFIG_PATH = Path("config.json")
 DEFAULT_CONFIG = {
     "locations": {
-        "4EY_Allen": {"sales_start_date": None, "opening_date": None, "selected_campaigns": []},
+        "4EY_New_Albany": {"sales_start_date": None, "opening_date": None, "selected_campaigns": []},
     },
     "attrition": {"mode": "avg_monthly_stay", "attrition_rate": 8, "avg_monthly_stay": 12},
 }
@@ -274,7 +274,7 @@ def _auto_add_locations_to_config(location_names):
 
 @app.get("/api/locations")
 def get_locations():
-    return ["4EY_Allen"]
+    return ["4EY_New_Albany"]
 
 
 @app.get("/api/campaigns")
